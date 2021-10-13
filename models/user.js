@@ -10,6 +10,7 @@ class User {
       email: user.email,
       isAdmin: user.is_admin,
       createdAt: user.created_at,
+      username: user.username,
     }
   }
 
@@ -33,7 +34,7 @@ class User {
   }
 
   static async register(credentials) {
-    const requiredFields = ["email", "password", "isAdmin"]
+    const requiredFields = ["email", "username", "password", "isAdmin"]
     requiredFields.forEach((property) => {
       if (!credentials.hasOwnProperty(property)) {
         throw new BadRequestError(`Missing ${property} in request body.`)
@@ -49,8 +50,14 @@ class User {
       throw new BadRequestError(`A user already exists with email: ${credentials.email}`)
     }
 
+    const existingUserWithUsername = await User.fetchUserByUsername(credentials.username)
+    if (existingUserWithUsername) {
+      throw new BadRequestError(`A user already exists with username: ${credentials.username}`)
+    }
+
     const hashedPassword = await bcrypt.hash(credentials.password, BCRYPT_WORK_FACTOR)
     const normalizedEmail = credentials.email.toLowerCase()
+    const normalizeUsername = credentials.username.toLowerCase()
 
     const userResult = await db.query(
       `INSERT INTO users (email, password, is_admin)
@@ -72,6 +79,20 @@ class User {
     const query = `SELECT * FROM users WHERE email = $1`
 
     const result = await db.query(query, [email.toLowerCase()])
+
+    const user = result.rows[0]
+
+    return user
+  }
+
+  static async fetchUserByUsername(username) {
+    if (!username) {
+      throw new BadRequestError("No username provided")
+    }
+
+    const query = `SELECT * FROM users WHERE username = $1`
+
+    const result = await db.query(query, [username.toLowerCase()])
 
     const user = result.rows[0]
 
